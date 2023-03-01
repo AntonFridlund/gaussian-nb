@@ -1,3 +1,3 @@
-module github.com/antonfridlund/go-naive-bayes
+module github.com/antonfridlund/go-gaussian-classifier
 
 go 1.20
