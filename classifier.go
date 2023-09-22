@@ -1,13 +1,11 @@
-package gaussian
+package naivebayes
 
 import "math"
 
-type Class int // Used for readability purposes.
-
 type NaiveBayes struct {
-	classes map[Class][][]float64
-	means   map[Class][]float64
-	stddevs map[Class][]float64
+	classes map[int][][]float64
+	means   map[int][]float64
+	stddevs map[int][]float64
 }
 
 // Gaussian Probability Density Function.
@@ -16,73 +14,68 @@ func gaussianPDF(x, mean, std float64) float64 {
 }
 
 // Calculate mean values for each feature
-func calculateMeans(examples [][]float64) []float64 {
-	features := len(examples[0])
-	means := make([]float64, features)
-	for i := 0; i < features; i++ {
-		sum := 0.0
-		for _, example := range examples {
-			sum += example[i]
+func calculateMeans(features [][]float64) []float64 {
+	featureLength := len(features[0])
+	means := make([]float64, featureLength)
+	for i := 0; i < featureLength; i++ {
+		var sum float64
+		for _, feature := range features {
+			sum += feature[i]
 		}
-		means[i] = sum / float64(len(examples))
+		means[i] = sum / float64(len(features))
 	}
 	return means
 }
 
 // Calculate standard deviations for each feature
-func calculateStddevs(examples [][]float64, means []float64) []float64 {
-	features := len(examples[0])
-	stddevs := make([]float64, features)
-	for i := 0; i < features; i++ {
-		sum := 0.0
-		for _, example := range examples {
-			sum += math.Pow(example[i]-means[i], 2)
+func calculateStddevs(features [][]float64, means []float64) []float64 {
+	featureLength := len(features[0])
+	stddevs := make([]float64, featureLength)
+	for i := 0; i < featureLength; i++ {
+		var sum float64
+		for _, feature := range features {
+			sum += math.Pow(feature[i]-means[i], 2)
 		}
-		stddevs[i] = math.Sqrt(sum / float64(len(examples)))
+		stddevs[i] = math.Sqrt(sum / float64(len(features)))
 	}
 	return stddevs
 }
 
 func (nb *NaiveBayes) Fit(X [][]float64, y []int) {
 	// Divide the dataset into categories
-	categories := make(map[Class][][]float64)
-	for i, example := range X {
-		class := Class(y[i])
-		categories[class] = append(categories[class], example)
+	categories := make(map[int][][]float64)
+	for i, feature := range X {
+		class := y[i]
+		categories[class] = append(categories[class], feature)
 	}
 
-	means := make(map[Class][]float64)
-	stddevs := make(map[Class][]float64)
-	for class, examples := range categories {
-		// Calculate mean values for each feature
-		means[class] = calculateMeans(examples)
-		// Calculate standard deviations for each feature
-		stddevs[class] = calculateStddevs(examples, means[class])
+	// Calculate mean and standard deviation
+	means := make(map[int][]float64)
+	stddevs := make(map[int][]float64)
+	for class, features := range categories {
+		means[class] = calculateMeans(features)
+		stddevs[class] = calculateStddevs(features, means[class])
 	}
 
-	// Store the data in the NaiveBayes struct
 	nb.classes = categories
 	nb.stddevs = stddevs
 	nb.means = means
 }
 
 func (nb *NaiveBayes) Predict(X [][]float64) []int {
-	// Slice to store the predictions for each example
 	predictions := make([]int, len(X))
-	for i, example := range X {
-		// Map to store the probability of the example belonging to each class
-		probabilities := make(map[Class]float64)
-		// Calculate the probability of the example belonging to each class
+	for i, features := range X {
+		probabilities := make(map[int]float64)
 		for class := range nb.classes {
 			probabilities[class] = 1.0
-			for j, feature := range example {
+			for j, feature := range features {
 				// Calculate the probability of the feature belonging to the class using the Gaussian PDF
 				probabilities[class] += math.Log(gaussianPDF(feature, nb.means[class][j], nb.stddevs[class][j]))
 			}
 		}
 
 		// Find the class with the highest probability
-		var bestClass Class
+		var bestClass int
 		max := math.Inf(-1)
 		for class, probability := range probabilities {
 			if probability > max {
@@ -90,22 +83,18 @@ func (nb *NaiveBayes) Predict(X [][]float64) []int {
 				bestClass = class
 			}
 		}
-
-		// Append the prediction for the example to the slice of predictions
-		predictions[i] = int(bestClass)
+		predictions[i] = bestClass
 	}
 	return predictions
 }
 
 func (nb *NaiveBayes) AccuracyScore(preds []int, y []int) float64 {
-	correct := 0
-	// Increment correct counter if the prediction is correct
+	var correct float64 = float64(len(preds))
 	for i, pred := range preds {
-		if pred == y[i] {
-			correct++
+		if pred != y[i] {
+			correct--
 		}
 	}
-	// Calculate the accuracy as a percentage and return it
-	accuracy := float64(correct) / float64(len(preds))
+	accuracy := correct / float64(len(preds))
 	return accuracy
 }
